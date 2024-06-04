@@ -1,6 +1,6 @@
 # k8s 部署文档新版
 
-
+https://www.kancloud.cn/king_om/kubernetes/3154676
 
 # 环境准备
 
@@ -167,8 +167,8 @@ https://github.com/Mirantis/cri-dockerd/releases
 
 # 解压并复制过去
 tar -zxvf ./cri-dockerd-0.3.14.amd64.tgz
-cp -r ./cri-dockerd /usr/bin/
-chmod +x /usr/bin/cri-dockerd/cri-dockerd 
+cp -r ./cri-dockerd/cri-dockerd  /usr/bin/
+chmod +x /usr/bin/cri-dockerd 
 
 # 配置启动
 cat >  /etc/systemd/system/cri-dockerd.service << EOF
@@ -251,7 +251,7 @@ kubeadm join 192.168.5.50:6443 --token s7gyv0.952oopqzi48s2t4m \
         --cri-socket unix:///var/run/cri-dockerd.sock
 ```
 
-### 部署网络插件 fannel
+### 部署网络插件 calio
 
 ```sh
 vi calio.yaml
@@ -259,6 +259,10 @@ vi calio.yaml
 - name: CALICO_IPV4POOL_CIDR
    value: "10.8.0.0/16" # 对应初始化命令的 ip
 ```
+
+### 部署 ingerss
+
+
 
 
 
