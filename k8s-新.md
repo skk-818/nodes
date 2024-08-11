@@ -31,6 +31,8 @@ IPADDR="192.168.5.40" # 根据 vm 配置来
 GATEWAY="192.168.5.2"
 NETMASK="255.255.255.0"
 DNS1="192.168.5.2"
+
+systemctl restart network
 ```
 
 ### 节点环境
@@ -76,27 +78,6 @@ hostnamectl set-hostname master
 192.168.5.43 node2
 192.168.5.44 node3 
 
-# 时间同步
-systemctl start chronyd
-systemctl enable chronyd
-date
-# 禁用SELinux和Firewalld服务：
-systemctl stop firewalld
-systemctl disable firewalld
-
-sed -i 's/enforcing/disabled/' /etc/selinux/config # 重启后生效
-
-# 临时禁用swap分区
-swapoff -a
-
-# 永久禁用swap分区
-sed -ri 's/.*swap.*/#&/' /etc/fstab
-$ swapoff -a # 临时关闭swap分区
-$ vi /etc/fstab # 永久关闭swap分区，注释掉fstab中包含swap的这一行即可
-# /dev/mapper/centos-swap swap                    swap    defaults        0 0
-$ reboot #重启使其生效
-# 需要重启服务器生效
-reboot
 
 # 配置网桥过滤和地址转发
 cat > /etc/sysctl.d/kubernetes.conf << EOF
@@ -105,8 +86,65 @@ net.bridge.bridge-nf-call-iptables = 1
 net.ipv4.ip_forward = 1
 EOF
 
-# 然后执行,生效
 sysctl --system
+# 使用以下命令验证 net.ipv4.ip_forward 是否设置为 1
+sysctl net.ipv4.ip_forward
+
+
+# 配置 ipvs 功能
+yum install ipset ipvsadm -y
+# 添加需要加载的模块写入脚本文件
+cat <<EOF> /etc/sysconfig/modules/ipvs.modules
+#!/bin/bash
+modprobe -- ip_vs
+modprobe -- ip_vs_rr
+modprobe -- ip_vs_wrr
+modprobe -- ip_vs_sh
+modprobe -- nf_conntrack_ipv4
+EOF
+# 为脚本添加执行权限 
+chmod +x /etc/sysconfig/modules/ipvs.modules
+# 执行脚本文件
+/bin/bash /etc/sysconfig/modules/ipvs.modules
+# 查看模块是否加载成功
+lsmod | grep -e ip_vs -e nf_conntrack_ipv4
+
+ip_vs_sh               12688  0 
+ip_vs_wrr              12697  0 
+ip_vs_rr               12600  0 
+ip_vs                 145458  6 ip_vs_rr,ip_vs_sh,ip_vs_wrr
+nf_conntrack_ipv4      19149  7 
+nf_defrag_ipv4         12729  1 nf_conntrack_ipv4
+nf_conntrack          143411  9 ip_vs,nf_nat,nf_nat_ipv4,nf_nat_ipv6,xt_conntrack,nf_nat_masquerade_ipv4,nf_conntrack_netlink,nf_conntrack_ipv4,nf_conntrack_ipv6
+libcrc32c              12644  4 xfs,ip_vs,nf_nat,nf_conntrack
+
+
+
+# 时间同步
+systemctl start chronyd
+systemctl enable chronyd
+date
+
+
+
+# 禁用SELinux和Firewalld服务：
+systemctl stop firewalld
+systemctl disable firewalld
+sed -i 's/enforcing/disabled/' /etc/selinux/config # 重启后生效
+
+
+# 禁用swap分区
+$ swapoff -a # 临时关闭swap分区
+$ vi /etc/fstab # 永久关闭swap分区，注释掉fstab中包含swap的这一行即可
+# /dev/mapper/centos-swap swap                    swap    defaults        0 0
+
+# 需要重启服务器生效
+reboot
+
+# 确认环境
+查看防火墙状态. 查看防火墙状态systemctl status firewalld
+查看swap分区情况 free 
+查看SELinux状态：  sestatus
 ```
 
 
@@ -145,7 +183,7 @@ systemctl enable  docker # 开机自动启动
 
 # k8s 安装
 
-### 设置国内镜像源
+### 设置国内镜像源，旧版本，k8s版本停留在1.28
 
 ```sh
 cat > /etc/yum.repos.d/kubernetes.repo << EOF
@@ -159,6 +197,29 @@ gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors
 EOF
 ```
 
+### k8s 新版阿里云镜像,根据要下载的版本，更换 v1.28
+
+```sh
+cat <<EOF | tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.31/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.31/rpm/repodata/repomd.xml.key
+EOF
+setenforce 0 # 关闭selinux 防火墙 关闭了 selinux 就不用了
+# 会提示没有软件包，更新一下源
+yum clean all
+yum makecache
+yum update
+# yum list kubelet kubeadm kubectl 看一下可安装的包
+yum install -y kubelet kubeadm kubectl
+systemctl enable kubelet && systemctl start kubelet
+```
+
+
+
 ### cri-docker
 
 ```sh
@@ -167,8 +228,8 @@ https://github.com/Mirantis/cri-dockerd/releases
 
 # 解压并复制过去
 tar -zxvf ./cri-dockerd-0.3.14.amd64.tgz
-cp -r ./cri-dockerd/cri-dockerd  /usr/bin/
-chmod +x /usr/bin/cri-dockerd 
+cp -r ./cri-dockerd/cri-dockerd  /usr/local/bin/
+chmod +x /usr/local/bin/cri-dockerd 
 
 # 配置启动
 cat >  /etc/systemd/system/cri-dockerd.service << EOF
@@ -223,9 +284,6 @@ systemctl enable cri-dockerd.service # 开机自启
 ```sh
 # 安装组件并记录好版本
 yum install -y kubelet kubeadm kubectl
-
-chmod 755 /etc/sysconfig/modules/ipvs.modules && bash /etc/sysconfig/modules/ipvs.modules && lsmod | grep -e ip_vs -enf_conntrack_ipv4
-
 ```
 
 ### 初始化集群
@@ -233,9 +291,9 @@ chmod 755 /etc/sysconfig/modules/ipvs.modules && bash /etc/sysconfig/modules/ipv
 ```sh
 
  kubeadm init \
---apiserver-advertise-address=192.168.5.50 \
+--apiserver-advertise-address=192.168.5.90 \
 --image-repository registry.aliyuncs.com/google_containers \
---kubernetes-version v1.28.2 \
+--kubernetes-version v1.30 \
 --service-cidr=10.9.0.0/16 \
 --pod-network-cidr=10.8.0.0/16 \
 --cri-socket unix:///var/run/cri-dockerd.sock
@@ -246,7 +304,7 @@ chmod 755 /etc/sysconfig/modules/ipvs.modules && bash /etc/sysconfig/modules/ipv
  rm -r $HOME/.kube/config
  
  
-kubeadm join 192.168.5.50:6443 --token s7gyv0.952oopqzi48s2t4m \
+kubeadm join 192.168.5.90:6443 --token s7gyv0.952oopqzi48s2t4m \
         --discovery-token-ca-cert-hash sha256:7b590b05e95ae5bbebed6f3f96880533b9149b57c4288fb9e283aff3f2ef6d2a \
         --cri-socket unix:///var/run/cri-dockerd.sock
 ```
@@ -262,7 +320,7 @@ vi calio.yaml
 
 ### 部署 ingerss
 
-
+全节点部署 ingress https://www.kancloud.cn/king_om/kubernetes/3154676 
 
 
 
