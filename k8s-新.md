@@ -172,7 +172,14 @@ systemctl start docker
 [root@master ~]# vim /etc/docker/daemon.json
 {
 	"exec-opts": ["native.cgroupdriver=systemd"],
-	"registry-mirrors": ["https://kn0t2bca.mirror.aliyuncs.com"]
+     "registry-mirrors": [
+        "https://dockerhub.icu",
+        "https://docker.chenby.cn",
+        "https://docker.1panel.live",
+        "https://docker.awsl9527.cn",
+        "https://docker.anyhub.us.kg",
+        "https://dhub.kubesre.xyz"
+      ]
 }
 
 systemctl restart  docker 
@@ -203,10 +210,10 @@ EOF
 cat <<EOF | tee /etc/yum.repos.d/kubernetes.repo
 [kubernetes]
 name=Kubernetes
-baseurl=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.31/rpm/
+baseurl=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.30/rpm/
 enabled=1
 gpgcheck=1
-gpgkey=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.31/rpm/repodata/repomd.xml.key
+gpgkey=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.30/rpm/repodata/repomd.xml.key
 EOF
 setenforce 0 # 关闭selinux 防火墙 关闭了 selinux 就不用了
 # 会提示没有软件包，更新一下源
@@ -221,6 +228,8 @@ systemctl enable kubelet && systemctl start kubelet
 
 
 ### cri-docker
+
+==每个节点都要安装==
 
 ```sh
 # 下载地址
@@ -292,8 +301,8 @@ yum install -y kubelet kubeadm kubectl
 
  kubeadm init \
 --apiserver-advertise-address=192.168.5.90 \
---image-repository registry.aliyuncs.com/google_containers \
---kubernetes-version v1.30 \
+--image-repository=registry.aliyuncs.com/google_containers \
+--kubernetes-version v1.30.3 \
 --service-cidr=10.9.0.0/16 \
 --pod-network-cidr=10.8.0.0/16 \
 --cri-socket unix:///var/run/cri-dockerd.sock
@@ -303,19 +312,31 @@ yum install -y kubelet kubeadm kubectl
  kubeadm reset 
  rm -r $HOME/.kube/config
  
- 
-kubeadm join 192.168.5.90:6443 --token s7gyv0.952oopqzi48s2t4m \
-        --discovery-token-ca-cert-hash sha256:7b590b05e95ae5bbebed6f3f96880533b9149b57c4288fb9e283aff3f2ef6d2a \
+        
+kubeadm join 192.168.5.90:6443 --token 4nfqzw.hy3c3lntkzwult2m \
+        --discovery-token-ca-cert-hash sha256:8ae584615bc703ef06567fc0e0cc5987ad43b5975d851c89bc26b8153d0d6610 \
         --cri-socket unix:///var/run/cri-dockerd.sock
 ```
 
 ### 部署网络插件 calio
 
 ```sh
+# 下载
+wget https://docs.projectcalico.org/v3.8/manifests/calico.yaml
+
+# 修改网络地址
 vi calio.yaml
 
 - name: CALICO_IPV4POOL_CIDR
    value: "10.8.0.0/16" # 对应初始化命令的 ip
+
+# 经常出现 镜像拉不下来的情况，先把镜像在每个节点上都拉下来再安装
+docker.io/calico/kube-controllers:v3.25.0
+docker.io/calico/cni:v3.25.0
+docker.io/calico/node:v3.25.0
+
+# 执行安装
+kubectl apply -f ./calio.yaml
 ```
 
 ### 部署 ingerss
