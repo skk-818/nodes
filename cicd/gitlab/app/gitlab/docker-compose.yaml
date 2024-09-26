@@ -1,0 +1,83 @@
+services:
+  redis:
+    container_name: gitlab_redis
+    restart: always
+    image: redis:6.2.6
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis/data:/data
+    networks:
+      - gitlab_net
+ 
+  postgresql:
+    container_name: gitlab_postgresql
+    restart: always
+    image: sameersbn/postgresql:14-20230628
+    volumes:
+      - ./postgresql/data:/var/lib/postgresql
+    ports:
+      - 5432:5432
+    environment:
+      - DB_USER=gitlab
+      - DB_PASS=gitlab123
+      - DB_NAME=gitlabdb
+      - DB_EXTENSION=pg_trgm,btree_gist
+    networks:
+      - gitlab_net
+ 
+  gitlab:
+    container_name: gitlab
+    restart: always
+    image: sameersbn/gitlab:16.8.2
+    depends_on:
+      - redis
+      - postgresql
+    ports:
+      - "8080:80"
+      - "8022:22"
+    volumes:
+      - ./gitlab/data:/home/git/data
+    networks:
+      - gitlab_net
+    environment:
+      - DEBUG=false
+      # 配置连接 postgresql 的信息
+      - DB_ADAPTER=postgresql
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - DB_USER=gitlab
+      - DB_PASS=gitlab123
+      - DB_NAME=gitlabdb
+      # 配置连接 redis 的信息
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # 配置时区
+      - TZ=Asia/Shanghai
+      - GITLAB_TIMEZONE=Asia/Shanghai
+      # 禁用 https 以及自签名功能
+      - GITLAB_HTTPS=false
+      - SSL_SELF_SIGNED=false
+      # 配置服务地址（由于在容器内，配置localhost即可），端口等信息
+      - GITLAB_HOST=localhost
+      - GITLAB_PORT=8080
+      - GITLAB_SSH_PORT=8022
+      # 以下 3 个配置项必须要有，否则无法启动 gitlab 服务
+      - GITLAB_SECRETS_DB_KEY_BASE=long-and-random-alphanumeric-string
+      - GITLAB_SECRETS_SECRET_KEY_BASE=long-and-random-alphanumeric-string
+      - GITLAB_SECRETS_OTP_KEY_BASE=long-and-random-alphanumeric-string
+      # 禁用通知功能
+      - GITLAB_NOTIFY_ON_BROKEN_BUILDS=false
+      - GITLAB_NOTIFY_PUSHER=false
+      # 禁用自动备份功能
+      - GITLAB_BACKUP_SCHEDULE=disable
+      # 禁用 smtp 功能
+      - SMTP_ENABLED=false
+      # 禁用 imap 功能
+      - IMAP_ENABLED=false
+      # 禁用 oAuth 认证
+      - OAUTH_ENABLED=false
+ 
+networks:
+  gitlab_net:
+    driver: bridge
