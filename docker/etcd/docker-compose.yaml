@@ -1,0 +1,17 @@
+services:
+  etcd:
+    image: quay.io/coreos/etcd:latest
+    container_name: etcd
+    restart: always
+    volumes:
+      - ./data:/etcd-data  # 持久化数据
+      - ./conf/etcd.conf:/etc/etcd/etcd.conf  # 挂载配置文件
+    ports:
+      - "2379:2379"  # etcd 服务端口
+    command: ["etcd", "--config-file=/etc/etcd/etcd.conf"]
+    networks:
+      - etcd-network
+
+networks:
+  etcd-network:
+    driver: bridge

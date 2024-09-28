@@ -1,0 +1,20 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root  # 设置根用户
+      MONGO_INITDB_ROOT_PASSWORD: 123456  # 设置密码
+    volumes:
+      - ./data:/data/db  # 持久化数据
+      - ./conf/mongodb.conf:/etc/mongo/mongodb.conf  # 挂载配置文件
+    ports:
+      - "27017:27017"  # MongoDB 服务端口
+    command: ["mongod", "--config", "/etc/mongo/mongodb.conf"]
+    networks:
+      - mongo-network
+
+networks:
+  mongo-network:
+    driver: bridge
