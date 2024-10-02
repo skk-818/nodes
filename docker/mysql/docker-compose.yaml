@@ -1,14 +1,15 @@
 services:
-  mysql:
+  work_mysql:
     image: mysql:8.0.27
-    container_name: mysql8.0
+    container_name: work_mysql8.0
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 123456
       TZ: Asia/Shanghai  # 设置时区为上海
     volumes:
-      - /data/:/var/lib/mysql
-      - /conf/my.cnf:/etc/mysql/my.cnf
+      - ./data/:/var/lib/mysql
+      - ./conf/my.cnf:/etc/mysql/my.cnf
+      - ./mysql-files:/var/lib/mysql-files  # 挂载 secure-file-priv 目录
     ports:
       - "3306:3306"
     networks:

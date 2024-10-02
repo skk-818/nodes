@@ -1,7 +1,7 @@
 services:
-  etcd:
-    image: quay.io/coreos/etcd:latest
-    container_name: etcd
+  work_etcd:
+    image: bitnami/etcd:latest
+    container_name: work_etcd
     restart: always
     volumes:
       - ./data:/etcd-data  # 持久化数据
