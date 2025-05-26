@@ -1,5 +1,5 @@
 services:
-  web:
+  dpanel:
     image: dpanel/dpanel:latest
     container_name: dpanel
     restart: always

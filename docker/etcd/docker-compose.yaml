@@ -1,13 +1,13 @@
 services:
-  work_etcd:
+  etcd:
     image: bitnami/etcd:latest
-    container_name: work_etcd
+    container_name: etcd
     restart: always
     volumes:
       - ./data:/etcd-data  # 持久化数据
       - ./conf/etcd.conf:/etc/etcd/etcd.conf  # 挂载配置文件
     environment:
-      - ETCD_ADVERTISE_CLIENT_URLS=http://192.168.5.100:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://192.168.5.128:2379
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
       - ALLOW_NONE_AUTHENTICATION=yes
     ports:

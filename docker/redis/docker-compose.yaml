@@ -1,7 +1,7 @@
 services:
-  work_redis:
+  redis:
     image: redis:latest
-    container_name: work_redis
+    container_name: redis
     restart: always
     volumes:
       - ./data:/data  # 持久化数据
