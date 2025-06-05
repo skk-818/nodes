@@ -5,13 +5,14 @@ services:
     image: dockurr/macos
     container_name: macos
     environment:
-      VERSION: "15"
+      VERSION: "14"
       RAM: "8192"
       SMP: "4"
       USER: "user"
       PASSWORD: "password"
       VNC_PASSWORD: "123456"
       RESOLUTION: "2520x1680"
+      DISK: "128"
     devices:
       - /dev/kvm
       - /dev/net/tun
