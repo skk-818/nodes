@@ -7,7 +7,12 @@ services:
     image: zookeeper:3.7
     container_name: zookeeper
     ports:
-      - "2181:2181"
+      - "2181:2181"  # 宿主机2181映射到容器2181端口
+    volumes:
+      # 宿主机 ./data/zookeeper/data 挂载到容器 /data，存储ZK数据
+      - ./data/zookeeper/data:/data
+      # 宿主机 ./data/zookeeper/datalog 挂载到容器 /datalog，存储ZK事务日志
+      - ./data/zookeeper/datalog:/datalog
     networks:
       - zeroim
 
@@ -19,9 +24,16 @@ services:
     environment:
       KAFKA_BROKER_ID: 0
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://host.docker.internal:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+
+      # 向外和向内广播两个地址
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092,PLAINTEXT_INTERNAL://kafka:19092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:19092
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_HOST_NAME: kafka
+    volumes:
+      - ./data/kafka:/kafka
     networks:
       - zeroim
     depends_on:
@@ -34,9 +46,11 @@ services:
       - "8080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local-kafka
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      # ⛳ 使用 Kafka 容器名 + 内部监听端口
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
     networks:
       - zeroim
     depends_on:
       - kafka
+
